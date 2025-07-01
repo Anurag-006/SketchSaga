@@ -20,7 +20,8 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/ws": "^8.18.1",
     "@repo/backend-common": "workspace:*",
-    "@repo/common": "workspace:*"
+    "@repo/common": "workspace:*",
+    "@repo/database": "workspace:*"
   },
   "keywords": [],
   "author": "",

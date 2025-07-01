@@ -4,6 +4,7 @@ import jwt, { JwtPayload } from "jsonwebtoken";
 import bodyParser from "body-parser";
 import { roomMiddleware } from "./middleware.js";
 import { JWT_SECRET } from "@repo/backend-common/config";
+import cors from "cors";
 import {
   createRoomSchema,
   createUserSchema,
@@ -17,6 +18,7 @@ interface AuthenticatedRequest extends Request {
 const app = express();
 
 app.use(bodyParser.json());
+app.use(cors());
 
 app.listen(4001, () => {
   console.log("Server started on PORT:", 4001);
@@ -122,4 +124,37 @@ app.post("/room", roomMiddleware, async (req, res) => {
       success: false,
     });
   }
+});
+
+app.get("/chats/:roomId", async (req, res) => {
+  const roomId = Number(req.params.roomId);
+  const messages = await prismaClient.chat.findMany({
+    where: {
+      roomId: Number(roomId),
+    },
+    orderBy: {
+      id: "desc",
+    },
+    take: 50,
+  });
+
+  res.status(200).json({
+    messages: messages,
+    success: true,
+  });
+});
+
+app.get("/room/:slug", async (req, res) => {
+  const slug = req.params.slug;
+
+  const room = await prismaClient.room.findFirst({
+    where: {
+      slug,
+    },
+  });
+
+  res.status(200).json({
+    room,
+    success: true,
+  });
 });

@@ -8,10 +8,12 @@ import Footer from "../components/ui/Footer";
 function Home() {
   return (
     <div className="min-h-screen">
+      <Navigation />
       <Hero />
       <Features />
       <Gallery />
       <CTA />
+      <Footer />
     </div>
   );
 }

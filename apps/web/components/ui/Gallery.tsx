@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const examples = [
   {
     title: "System Architecture",
@@ -70,7 +72,7 @@ export default function Gallery() {
               className="group bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl dark:shadow-gray-900/50 transition-all duration-300 transform hover:-translate-y-2"
             >
               <div className="relative overflow-hidden">
-                <img
+                <Image
                   src={example.image}
                   alt={example.title}
                   className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"

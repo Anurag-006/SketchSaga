@@ -1,5 +1,4 @@
 "use client";
-import axios from "axios";
 
 export function AuthPage({ isSignin }: { isSignin: boolean }) {
   function handleClick(isSignin: boolean): void {}

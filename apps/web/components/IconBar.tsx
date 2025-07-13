@@ -4,69 +4,46 @@ import {
   RectangleHorizontal,
   Circle,
   Pencil,
+  MousePointer2,
 } from "lucide-react";
+
+const tools = [
+  { name: "rect", Icon: RectangleHorizontal },
+  { name: "circle", Icon: Circle },
+  { name: "line", Icon: ArrowUpRight },
+  { name: "pencil", Icon: Pencil },
+  { name: "selectTool", Icon: MousePointer2 },
+];
 
 export default function IconBar({
   currentShape,
 }: {
   currentShape: RefObject<string>;
 }) {
-  const [circleColor, setCircleColor] = useState("bg-white");
-  const [rectColor, setRectColor] = useState("bg-red-300");
-  const [lineColor, setLineColor] = useState("bg-white");
-  const [pencilColor, setPencilColor] = useState("bg-white");
+  const [selected, setSelected] = useState("rect");
+
+  const handleClick = (tool: string) => {
+    currentShape.current = tool;
+    setSelected(tool);
+  };
 
   return (
-    <div className="flex flex-row p-2 rounded-2xl">
-      <div className={`m-2 ${rectColor} rounded-2xl`}>
-        <RectangleHorizontal
-          className={`m-2 ${rectColor}`}
-          onClick={() => {
-            currentShape.current = "rect";
-            setCircleColor("bg-white");
-            setLineColor("bg-white");
-            setRectColor("bg-red-300");
-            setPencilColor("bg-white");
-          }}
-        />
-      </div>
-      <div className={`m-2 ${circleColor} rounded-2xl`}>
-        <Circle
-          className={`m-2 ${circleColor}`}
-          onClick={() => {
-            currentShape.current = "circle";
-            setCircleColor("bg-red-300");
-            setLineColor("bg-white");
-            setRectColor("bg-white");
-            setPencilColor("bg-white");
-          }}
-        />
-      </div>
-      <div className={`m-2 ${lineColor} rounded-2xl`}>
-        <ArrowUpRight
-          className={`m-2 ${lineColor}`}
-          onClick={() => {
-            currentShape.current = "line";
-            setCircleColor("bg-white");
-            setLineColor("bg-red-300");
-            setRectColor("bg-white");
-            setPencilColor("bg-white");
-          }}
-        />
-      </div>
+    <div className="flex flex-row p-2 gap-2 bg-white shadow-lg rounded-2xl">
+      {tools.map(({ name, Icon }) => {
+        const baseClass = "p-2 rounded-2xl transition-all duration-150";
+        const activeClass =
+          selected === name ? "bg-red-300" : "bg-white hover:bg-gray-100";
 
-      <div className={`m-2 ${pencilColor} rounded-2xl`}>
-        <Pencil
-          className={`m-2 ${pencilColor}`}
-          onClick={() => {
-            currentShape.current = "pencil";
-            setCircleColor("bg-white");
-            setLineColor("bg-white");
-            setRectColor("bg-white");
-            setPencilColor("bg-red-300");
-          }}
-        />
-      </div>
+        return (
+          <button
+            key={name}
+            onClick={() => handleClick(name)}
+            className={`${baseClass} ${activeClass}`}
+          >
+            <Icon className="w-6 h-6" />
+          </button>
+        );
+      })}
     </div>
   );
 }

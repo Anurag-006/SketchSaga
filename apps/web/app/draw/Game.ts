@@ -39,6 +39,9 @@ export class Game {
   private currentShape: RefObject<string>;
   private prevX: number;
   private prevY: number;
+  private handleMouseDown!: (e: MouseEvent) => void;
+  private handleMouseUp!: (e: MouseEvent) => void;
+  private handleMouseMove!: (e: MouseEvent) => void;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -111,39 +114,45 @@ export class Game {
   }
 
   initMouseHandlers() {
-    this.canvas.addEventListener("mousedown", (e) => {
+    this.handleMouseDown = (e) => {
       this.startX = e.clientX;
       this.startY = e.clientY;
       this.mouseClicked = true;
-    });
 
-    this.canvas.addEventListener("mouseup", (e) => {
-      let shape = {};
+      if (this.currentShape.current === "selectTool") {
+        this.selectShape(e);
+      }
+    };
 
+    this.handleMouseUp = (e) => {
       if (this.currentShape.current === "rect") {
         const width = e.clientX - this.startX;
         const height = e.clientY - this.startY;
-        shape = {
+        const shape = {
           type: "rect",
           x: this.startX,
           y: this.startY,
           width,
           height,
         } as Shape;
+
+        this.sendShape(shape);
       }
 
       if (this.currentShape.current === "line") {
-        shape = {
+        const shape = {
           type: "line",
           x1: this.startX,
           y1: this.startY,
           x2: e.clientX,
           y2: e.clientY,
         } as Shape;
+
+        this.sendShape(shape);
       }
 
       if (this.currentShape.current === "circle") {
-        shape = {
+        const shape = {
           type: "circle",
           x: Math.abs(this.startX + (e.clientX - this.startX) / 2),
           y: Math.abs(this.startY + (e.clientY - this.startY) / 2),
@@ -153,6 +162,8 @@ export class Game {
           startAngle: 0,
           endAngle: 2 * Math.PI,
         } as Shape;
+
+        this.sendShape(shape);
       }
 
       if (this.currentShape.current === "pencil") {
@@ -160,35 +171,41 @@ export class Game {
         this.prevY = -1;
       }
 
-      const stringShape = JSON.stringify(shape);
-
-      const socketMsg = {
-        type: "chat",
-        data: {
-          message: stringShape,
-          roomId: this.roomId,
-        },
-      };
-
-      const finalMsg = JSON.stringify(socketMsg);
-
-      console.log(JSON.parse(finalMsg));
-
-      this.socket.send(finalMsg);
-
-      this.existingShapes.push(shape as Shape);
-
-      this.clearCanvas();
-
       this.mouseClicked = false;
-    });
+    };
 
-    this.canvas.addEventListener("mousemove", (e) => {
+    this.handleMouseMove = (e) => {
       if (this.mouseClicked) {
         this.clearCanvas();
         this.drawShape(e, this.currentShape.current);
       }
-    });
+    };
+
+    this.canvas.addEventListener("mousedown", this.handleMouseDown);
+    this.canvas.addEventListener("mouseup", this.handleMouseUp);
+    this.canvas.addEventListener("mousemove", this.handleMouseMove);
+  }
+
+  sendShape(shape: Shape) {
+    const stringShape = JSON.stringify(shape);
+
+    const socketMsg = {
+      type: "chat",
+      data: {
+        message: stringShape,
+        roomId: Number(this.roomId),
+      },
+    };
+
+    const finalMsg = JSON.stringify(socketMsg);
+
+    console.log("Sending shape from socket: ", finalMsg);
+
+    this.socket.send(finalMsg);
+
+    this.existingShapes.push(shape as Shape);
+
+    this.clearCanvas();
   }
 
   drawShape(event: MouseEvent, currentShape: string) {
@@ -220,12 +237,12 @@ export class Game {
       this.ctx.stroke();
     }
     if (currentShape === "pencil") {
-      this.ctx.beginPath();
       if (this.prevX === -1) {
         this.prevX = this.startX;
         this.prevY = this.startY;
       }
 
+      this.ctx.beginPath();
       this.ctx.moveTo(this.prevX, this.prevY);
       this.ctx.lineTo(event.clientX, event.clientY);
       this.ctx.strokeStyle = "rgba(255, 255, 255)";
@@ -241,25 +258,85 @@ export class Game {
       this.prevX = event.clientX;
       this.prevY = event.clientY;
 
-      const stringShape = JSON.stringify(shape);
-
-      const socketMsg = {
-        type: "chat",
-        data: {
-          message: stringShape,
-          roomId: this.roomId,
-        },
-      };
-
-      const finalMsg = JSON.stringify(socketMsg);
-
-      console.log(JSON.parse(finalMsg));
-
-      this.socket.send(finalMsg);
-
-      this.existingShapes.push(shape as Shape);
-
-      this.clearCanvas();
+      this.sendShape(shape);
     }
+  }
+
+  // Select Functionality
+
+  selectShape(e: MouseEvent) {
+    const x = e.clientX;
+    const y = e.clientY;
+
+    const selectedShape = this.existingShapes.find((shape) => {
+      if (shape.type === "rect") {
+        const x1 = Math.min(shape.x, shape.x + shape.width);
+        const x2 = Math.max(shape.x, shape.x + shape.width);
+        const y1 = Math.min(shape.y, shape.y + shape.height);
+        const y2 = Math.max(shape.y, shape.y + shape.height);
+
+        return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+      }
+
+      if (shape.type === "circle") {
+        const dx = x - shape.x;
+        const dy = y - shape.y;
+        return (
+          (dx * dx) / (shape.radiusX * shape.radiusX) +
+            (dy * dy) / (shape.radiusY * shape.radiusY) <=
+          1
+        );
+      }
+
+      if (shape.type === "line") {
+        const distance = this.pointToLineDistance(x, y, shape);
+        return distance < 5;
+      }
+    });
+
+    console.log(selectedShape);
+  }
+
+  pointToLineDistance(
+    x: number,
+    y: number,
+    line: { x1: number; y1: number; x2: number; y2: number },
+  ): number {
+    const { x1, y1, x2, y2 } = line;
+    const A = x - x1;
+    const B = y - y1;
+    const C = x2 - x1;
+    const D = y2 - y1;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    const param = lenSq !== 0 ? dot / lenSq : -1;
+
+    let xx, yy;
+
+    if (param < 0) {
+      xx = x1;
+      yy = y1;
+    } else if (param > 1) {
+      xx = x2;
+      yy = y2;
+    } else {
+      xx = x1 + param * C;
+      yy = y1 + param * D;
+    }
+
+    const dx = x - xx;
+    const dy = y - yy;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  destroy() {
+    // Remove canvas mouse handlers
+    this.canvas.removeEventListener("mousedown", this.handleMouseDown);
+    this.canvas.removeEventListener("mouseup", this.handleMouseUp);
+    this.canvas.removeEventListener("mousemove", this.handleMouseMove);
+
+    // Clear the canvas to free memory (optional)
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 }

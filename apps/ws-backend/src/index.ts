@@ -25,59 +25,88 @@ const wss = new WebSocketServer({ port: 8080 });
 
 wss.on("connection", (ws, req) => {
   const url = req.url;
-  if (!url) return ws.close();
+  if (!url) {
+    console.warn("❌ No URL in connection request");
+    return ws.close(1008, "Invalid connection");
+  }
 
   const token = new URLSearchParams(url.split("?")[1]).get("token") || "";
   const userId = checkUser(token);
-  if (!userId) return ws.close();
+  if (!userId) {
+    console.warn("❌ Invalid or missing token");
+    return ws.close(1008, "Authentication failed");
+  }
+  console.log("✅ Connection established from user:", userId);
 
   ws.on("message", async (data) => {
-    let parsed: WebSocketMessage;
     try {
-      parsed = JSON.parse(data.toString());
-    } catch {
-      console.warn("Invalid JSON");
-      return;
-    }
+      console.log("🟡 RAW message:", data.toString());
 
-    switch (parsed.type) {
-      case "join-room": {
-        const room = Number(parsed.data.roomId);
-        if (!rooms.has(room)) rooms.set(room, new Set());
-        rooms.get(room)!.add(ws);
-        break;
-      }
-      case "leave-room": {
-        const room = parsed.data.roomId;
-        rooms.get(room)?.delete(ws);
-        break;
-      }
-      case "chat": {
-        const { message } = parsed.data;
-        const roomId = Number(parsed.data.roomId);
-        const room = await prismaClient.room.findUnique({
-          where: { id: roomId },
-        });
+      const parsed: WebSocketMessage = JSON.parse(data.toString());
+      console.log("🟢 Parsed message:", parsed);
+      console.log("🔵 Type:", parsed.type);
 
-        if (!room) {
-          console.warn(`Room ${roomId} does not exist`);
-          return;
+      switch (parsed.type) {
+        case "join-room": {
+          const room = Number(parsed.data.roomId);
+          if (!rooms.has(room)) rooms.set(room, new Set());
+          rooms.get(room)!.add(ws);
+          console.log("✅ Joined room", room);
+          break;
         }
 
-        await prismaClient.chat.create({ data: { roomId, message, userId } });
-        rooms.get(roomId)?.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(
-              JSON.stringify({ type: "chat", data: { roomId, message } }),
-            );
+        case "leave-room": {
+          const room = parsed.data.roomId;
+          rooms.get(room)?.delete(ws);
+          break;
+        }
+
+        case "chat": {
+          console.log("💬 Inside chat");
+
+          const { message } = parsed.data;
+          const roomId = Number(parsed.data.roomId);
+
+          const room = await prismaClient.room.findUnique({
+            where: { id: roomId },
+          });
+
+          if (!room) {
+            console.warn(`⚠️ Room ${roomId} does not exist`);
+            return;
           }
-        });
-        break;
+
+          await prismaClient.chat.create({
+            data: { roomId, message, userId },
+          });
+
+          rooms.get(roomId)?.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(
+                JSON.stringify({
+                  type: "chat",
+                  data: { roomId, message },
+                }),
+              );
+            }
+          });
+
+          break;
+        }
       }
+    } catch (err) {
+      console.error("🔥 Error handling WS message", err);
+      ws.close(1011, "Internal server error"); 
     }
   });
 
-  ws.on("close", () => {
-    rooms.forEach((clients) => clients.delete(ws));
-  });
+ws.on("error", (err) => {
+  console.error("🛑 WebSocket error:", err);
+});
+
+ws.on("close", (code, reason) => {
+  console.warn("🔒 WebSocket closed", code, reason.toString());
+  rooms.forEach((clients) => clients.delete(ws));
+});
+
 });

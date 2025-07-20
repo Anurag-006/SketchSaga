@@ -9,23 +9,17 @@ interface AuthenticatedRequest extends Request {
 export function roomMiddleware(
   req: AuthenticatedRequest,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ): void {
-  const authHeader = req.headers["authorization"];
+  const token = req.cookies?.token;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    res
-      .status(401)
-      .json({ message: "Authorization header missing or malformed" });
+  if (!token) {
+    res.status(401).json({ message: "Unauthorized: No token provided" });
     return;
   }
 
-  const token = authHeader.split(" ")[1];
-
   try {
-    const decoded = jwt.verify(token as string, JWT_SECRET) as JwtPayload;
-
-    console.log(decoded);
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
 
     if (typeof decoded === "object" && decoded.userId) {
       req.userId = decoded.userId;

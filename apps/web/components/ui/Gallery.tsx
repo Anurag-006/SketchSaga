@@ -1,6 +1,8 @@
 import Image from "next/image";
+import { GalleryItem } from "../../types"; // Adjust path if necessary
 
-const examples = [
+// Example data with type
+const examples: GalleryItem[] = [
   {
     title: "System Architecture",
     category: "Technical Diagram",
@@ -45,7 +47,7 @@ const examples = [
   },
 ];
 
-export default function Gallery() {
+const Gallery: React.FC = () => {
   return (
     <section
       id="gallery"
@@ -76,6 +78,8 @@ export default function Gallery() {
                   src={example.image}
                   alt={example.title}
                   className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
+                  width={500}
+                  height={300}
                 />
                 <div className="absolute top-4 left-4">
                   <span className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -97,4 +101,6 @@ export default function Gallery() {
       </div>
     </section>
   );
-}
+};
+
+export default Gallery;

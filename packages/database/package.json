@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && prisma generate"
   },
   "keywords": [],
   "author": "",
@@ -15,7 +15,8 @@
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.15.3",
-    "prisma": "^6.10.1"
+    "prisma": "^6.10.1",
+    "typescript": "5.8.2"
   },
   "dependencies": {
     "@prisma/client": "6.10.1"

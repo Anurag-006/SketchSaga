@@ -71,7 +71,7 @@ export default function Navigation() {
 
               <DarkModeToggle
                 isDark={isDark}
-                toggle={() => setIsDark(!isDark)}
+                toggleAction={() => setIsDark(!isDark)}
               />
 
               <button
@@ -90,7 +90,10 @@ export default function Navigation() {
           </div>
 
           <div className="md:hidden flex items-center space-x-2">
-            <DarkModeToggle isDark={isDark} toggle={() => setIsDark(!isDark)} />
+            <DarkModeToggle
+              isDark={isDark}
+              toggleAction={() => setIsDark(!isDark)}
+            />
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"

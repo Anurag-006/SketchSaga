@@ -1,25 +1,32 @@
 import { useEffect, useState } from "react";
 
-export function useDarkMode() {
+export function useDarkMode(): [boolean | null, (value: boolean) => void] {
   const [isDark, setIsDark] = useState<boolean | null>(null);
 
-  // Set dark mode after component mounts
   useEffect(() => {
-    const saved = localStorage.getItem("darkMode");
+    const savedTheme = localStorage.getItem("theme");
     const prefersDark = window.matchMedia(
       "(prefers-color-scheme: dark)",
     ).matches;
-    const initial = saved !== null ? JSON.parse(saved) : prefersDark;
-    setIsDark(initial);
+
+    const initialDark = savedTheme ? savedTheme === "dark" : prefersDark;
+
+    setIsDark(initialDark);
   }, []);
 
-  // Sync class + storage
   useEffect(() => {
     if (isDark === null) return;
-    const root = document.documentElement;
-    root.classList.toggle("dark", isDark);
-    localStorage.setItem("darkMode", JSON.stringify(isDark));
+
+    const root = window.document.documentElement;
+
+    if (isDark) {
+      root.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      root.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
   }, [isDark]);
 
-  return [isDark, setIsDark] as const;
+  return [isDark, setIsDark];
 }

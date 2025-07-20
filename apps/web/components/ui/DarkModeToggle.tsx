@@ -3,18 +3,18 @@ import { Moon, Sun } from "lucide-react";
 
 interface DarkModeToggleProps {
   isDark: boolean | null;
-  toggle: () => void;
+  toggleAction: () => void;
 }
 
 export default function DarkModeToggle({
   isDark,
-  toggle,
+  toggleAction,
 }: DarkModeToggleProps) {
   if (isDark === null) return null; // Avoid hydration mismatch
 
   return (
     <button
-      onClick={toggle}
+      onClick={toggleAction}
       className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200"
       aria-label="Toggle dark mode"
     >

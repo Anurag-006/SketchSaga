@@ -5,11 +5,22 @@ import bodyParser from "body-parser";
 import { roomMiddleware } from "./middleware.js";
 import { JWT_SECRET } from "@repo/backend-common/config";
 import cors from "cors";
+import bcrypt from "bcryptjs";
+import dotenv from "dotenv";
+import path from "path";
+import cookieParser from "cookie-parser";
+import { fileURLToPath } from 'url';
+
 import {
   createRoomSchema,
   createUserSchema,
   signInSchema,
 } from "@repo/common/types";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 interface AuthenticatedRequest extends Request {
   user?: string | JwtPayload;
@@ -18,10 +29,19 @@ interface AuthenticatedRequest extends Request {
 const app = express();
 
 app.use(bodyParser.json());
-app.use(cors());
+app.use(cookieParser());
 
-app.listen(4001, () => {
-  console.log("Server started on PORT:", 4001);
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000", // frontend
+    credentials: true, // allow cookies if needed
+  }),
+);
+
+const PORT = process.env.PORT || 4001;
+
+app.listen(PORT, () => {
+  console.log("Server started on PORT:", PORT);
 });
 
 app.post("/signup", async (req: Request, res: Response) => {
@@ -39,8 +59,10 @@ app.post("/signup", async (req: Request, res: Response) => {
 
     //TODO: Hash the password
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     await prismaClient.user.create({
-      data: { email, photo, password, name },
+      data: { email, photo, password: hashedPassword, name },
     });
 
     res.status(200).json({
@@ -73,7 +95,8 @@ app.post("/signin", async (req: Request, res: Response) => {
       return;
     }
 
-    const correctPassword = password === user.password;
+    const correctPassword = await bcrypt.compare(password, user.password);
+
     if (!correctPassword) {
       res
         .status(403)
@@ -85,48 +108,71 @@ app.post("/signin", async (req: Request, res: Response) => {
       expiresIn: "1h",
     });
 
-    res.status(200).json({
-      message: "User sign-in successful",
-      success: true,
-      accessToken: newToken,
-    });
+
+    res
+      .cookie("token", newToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 3600000, // 1 hour
+        path: "/"
+      })
+      .json({ message: "Sign-in successful", success: true, token: newToken });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Internal server error", success: false });
   }
 });
 
+function generateRoomCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit number
+}
+
 app.post("/room", roomMiddleware, async (req, res) => {
-  const parsedData = createRoomSchema.safeParse(req.body);
-  if (!parsedData.success) {
-    res.status(203).json({
-      messsage: "Incorrect inputs",
+  //@ts-ignore
+  const userId = (req as AuthenticatedRequest).userId;
+
+  let slug = generateRoomCode();
+
+  let existingRoom = await prismaClient.room.findUnique({
+    where: { slug },
+  });
+
+  let tries = 0;
+  while (existingRoom && tries < 5) {
+    slug = generateRoomCode();
+    existingRoom = await prismaClient.room.findUnique({ where: { slug } });
+    tries++;
+  }
+
+  if (existingRoom) {
+    return res.status(500).json({
+      message: "Failed to generate a unique room code. Try again.",
       success: false,
     });
   }
-  // @ts-ignore
-  const userId = req.userId;
+
   try {
-    await prismaClient.room.create({
+    const createdRoom = await prismaClient.room.create({
       data: {
-        slug: parsedData.data?.name as string,
-        adminId: userId,
+        slug,
+        adminId: userId!,
       },
     });
 
     res.status(200).json({
       message: "Room created successfully",
-      roomId: parsedData.data?.name,
+      room: createdRoom
     });
   } catch (error) {
-    res.status(411).json({
-      message: "Room already exists with this name",
+    res.status(500).json({
+      message: "Unexpected error",
       success: false,
     });
   }
 });
 
-app.get("/chats/:roomId", async (req, res) => {
+app.get("/chats/:roomId", roomMiddleware, async (req, res) => {
   const roomId = Number(req.params.roomId);
   const messages = await prismaClient.chat.findMany({
     where: {
@@ -157,4 +203,16 @@ app.get("/room/:slug", async (req, res) => {
     room,
     success: true,
   });
+});
+
+app.get("/me", roomMiddleware, (req: Request, res: Response) => {
+  const token = req.cookies.token;
+  if (!token) return res.status(401).json({ user: null });
+
+  try {
+    const user = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    res.json({ user });
+  } catch {
+    res.status(401).json({ user: null });
+  }
 });

@@ -1,11 +1,20 @@
-import RoomCanvas from "../../../components/RoomCanvas";
+import AuthenticatedRoomCanvas from "../../../components/AuthenticatedRoomCanvas";
 
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ roomId: string }>;
-}) {
+export default async function Page({ params }: { params: Promise<{roomId: string}> }) {
   const { roomId } = await params;
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/room/${roomId}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
 
-  return <RoomCanvas roomId={roomId} />;
+  const data = await res.json();
+
+  if (!data.room) {
+    return <div className="text-center mt-10 text-red-500">Room not found.</div>;
+  }
+
+  console.log(data);
+  
+
+  return <AuthenticatedRoomCanvas roomId={data.room.id} />;
 }

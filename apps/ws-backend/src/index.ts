@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { JWT_SECRET } from "@repo/backend-common/config";
 import { prismaClient } from "@repo/database/client";
+import url from "url";
 
 type WebSocketMessage =
   | { type: "join-room"; data: { roomId: number } }
@@ -9,6 +10,17 @@ type WebSocketMessage =
   | { type: "chat"; data: { roomId: number; message: string } };
 
 const rooms = new Map<number, Set<WebSocket>>();
+
+function parseCookies(cookieHeader: string | undefined): Record<string, string> {
+  if (!cookieHeader) return {};
+  return Object.fromEntries(
+    cookieHeader.split(";").map(cookie => {
+      const [name, ...rest] = cookie.trim().split("=");
+      return [name, decodeURIComponent(rest.join("="))];
+    })
+  );
+}
+
 
 function checkUser(token: string): string | null {
   try {
@@ -24,18 +36,38 @@ function checkUser(token: string): string | null {
 const wss = new WebSocketServer({ port: 8080 });
 
 wss.on("connection", (ws, req) => {
-  const url = req.url;
-  if (!url) {
-    console.warn("❌ No URL in connection request");
-    return ws.close(1008, "Invalid connection");
-  }
+  // const cookieHeader = req.headers.cookie;
+  // console.log("Cookies recieved: ", cookieHeader);
 
-  const token = new URLSearchParams(url.split("?")[1]).get("token") || "";
-  const userId = checkUser(token);
-  if (!userId) {
+  // const cookies = parseCookies(cookieHeader);
+
+  // const token = cookies["token"] || cookies["auth_token"] || "";
+  const { query } = url.parse(req.url || "", true);
+  const token = query.token;
+
+  console.log(token);
+
+
+  if (!token || Array.isArray(token)) {
     console.warn("❌ Invalid or missing token");
     return ws.close(1008, "Authentication failed");
   }
+
+  let userId: string | null = null;
+  try {
+    userId = checkUser(token);
+  } catch (err) {
+    console.error("❌ JWT verification failed:", err);
+    ws.close(1008, "Invalid token");
+    return;
+  }
+
+  if (!userId) {
+    console.warn("❌ Invalid or missing userId in token");
+    ws.close(1008, "Unauthorized");
+    return;
+  }
+
   console.log("✅ Connection established from user:", userId);
 
   ws.on("message", async (data) => {
@@ -96,17 +128,17 @@ wss.on("connection", (ws, req) => {
       }
     } catch (err) {
       console.error("🔥 Error handling WS message", err);
-      ws.close(1011, "Internal server error"); 
+      ws.close(1011, "Internal server error");
     }
   });
 
-ws.on("error", (err) => {
-  console.error("🛑 WebSocket error:", err);
-});
+  ws.on("error", (err) => {
+    console.error("🛑 WebSocket error:", err);
+  });
 
-ws.on("close", (code, reason) => {
-  console.warn("🔒 WebSocket closed", code, reason.toString());
-  rooms.forEach((clients) => clients.delete(ws));
-});
+  ws.on("close", (code, reason) => {
+    console.warn("🔒 WebSocket closed", code, reason.toString());
+    rooms.forEach((clients) => clients.delete(ws));
+  });
 
 });

@@ -13,6 +13,7 @@ export default function Canvas({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const currentShape = useRef("rect");
+  const gameRef = useRef<Game | null> (null);
 
   useEffect(() => {
     let game: Game | null = null;
@@ -26,28 +27,28 @@ export default function Canvas({
 
     const handleResize = () => {
       setCanvasSize();
-      if (game) {
-        game.clearCanvas();
+      if (gameRef.current) {
+        gameRef.current.clearCanvas();
       }
     };
 
     if (canvasRef.current) {
       setCanvasSize();
-      game = new Game(canvasRef.current, roomId, socket, currentShape);
+      gameRef.current = new Game(canvasRef.current, roomId, socket, currentShape);
       window.addEventListener("resize", handleResize);
     }
 
     return () => {
-      if (game) game.destroy();
+      if (gameRef.current) gameRef.current?.destroy();
       window.removeEventListener("resize", handleResize);
     };
   }, [canvasRef, roomId, socket]);
 
   return (
-    <div className="h-screen bg-red overflow-hidden">
+    <div className="h-screen bg-black overflow-hidden">
       <canvas ref={canvasRef}></canvas>
       <div className="bg-white fixed top-6 rounded-2xl left-[80vh]">
-        <IconBar currentShape={currentShape} />
+        <IconBar currentShape={currentShape} gameRef={gameRef} />
       </div>
     </div>
   );

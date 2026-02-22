@@ -25,7 +25,7 @@ services:
 
   http-backend:
     # POINT TO ACR
-    image: anuragregistry01.azurecr.io/sketchsaga-http:v1
+    image: anuragregistry01.azurecr.io/sketchsaga-http:latest
     container_name: sketchsaga_prod_http
     restart: unless-stopped
     ports:
@@ -43,7 +43,7 @@ services:
 
   ws-backend:
     # POINT TO ACR
-    image: anuragregistry01.azurecr.io/sketchsaga-ws:v1
+    image: anuragregistry01.azurecr.io/sketchsaga-ws:latest
     container_name: sketchsaga_prod_ws
     restart: unless-stopped
     ports:
@@ -60,7 +60,7 @@ services:
 
   web:
     # POINT TO ACR
-    image: anuragregistry01.azurecr.io/sketchsaga-web:v1
+    image: anuragregistry01.azurecr.io/sketchsaga-web:latest
     container_name: sketchsaga_prod_web
     restart: unless-stopped
     ports:

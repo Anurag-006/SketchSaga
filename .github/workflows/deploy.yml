@@ -51,18 +51,11 @@ jobs:
           username: azureuser
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
-            # Create project directory if it doesn't exist
-            mkdir -p ~/sketchsaga
             cd ~/sketchsaga
+            # Log in to ACR using the Service Principal secrets (Securely)
+            echo "${{ secrets.ACR_PASSWORD }}" | docker login ${{ secrets.REGISTRY_LOGIN_SERVER }} -u ${{ secrets.ACR_USERNAME }} --password-stdin
 
-            # Login to ACR on the VM (Since we attached the role earlier, this is seamless)
-            sudo az acr login --name anuragregistry01
-
-            # Pull the new images
-            sudo docker compose -f docker-compose.prod.yml pull
-
-            # Restart services with the new images
-            sudo docker compose -f docker-compose.prod.yml up -d --remove-orphans
-
-            # Clean up old unused images to save disk space
-            sudo docker image prune -f
+            # Pull and Restart (No sudo needed now!)
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker image prune -f

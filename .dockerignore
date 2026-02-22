@@ -2,7 +2,6 @@
 
 # Git
 **/.git
-**/.gitignore
 
 # Dependencies
 **/node_modules

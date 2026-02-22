@@ -6,7 +6,7 @@ on:
 
 jobs:
   build-and-push:
-    runs-with: ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
 
   deploy-to-vm:
     needs: build-and-push
-    runs-with: ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3

@@ -16,7 +16,7 @@ export default function RoomOptionsPage() {
     try {
       const roomName = "Room " + Math.floor(Math.random() * 1000);
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/room`,
+        `${process.env.NEXT_PUBLIC_HTTP_BACKEND}/room`,
         { name: roomName },
         { withCredentials: true },
       );
@@ -35,7 +35,7 @@ export default function RoomOptionsPage() {
     setError("");
     try {
       const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/room/${roomId}`
+        `${process.env.NEXT_PUBLIC_HTTP_BACKEND}/room/${roomId}`
       );
       if (res.data.success) {
         router.push(`/canvas/${roomId}`);

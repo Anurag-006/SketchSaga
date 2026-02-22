@@ -39,7 +39,7 @@ export default function RoomCanvasWrapper({
 
     // for persistent rooms we *do not* force login; guests may join too
     // we still optionally fetch /me to know if the visitor has an account
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/me`, { credentials: "include" })
+    fetch(`${process.env.NEXT_PUBLIC_HTTP_BACKEND}/me`, { credentials: "include" })
       .then((res) => res.json())
       .then((data) => {
         if (data.user) {

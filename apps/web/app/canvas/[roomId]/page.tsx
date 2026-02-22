@@ -9,7 +9,7 @@ export default async function Page({
 
   const apiUrl =
     process.env.INTERNAL_HTTP_BACKEND ||
-    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.NEXT_PUBLIC_HTTP_BACKEND ||
     "http://localhost:4001";
 
   try {

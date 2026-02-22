@@ -26,7 +26,7 @@ export default function SignInPage() {
     // TODO: Add your actual sign-in logic here (API call, etc.)
     try {
       const signInResponse = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/signin`,
+        `${process.env.NEXT_PUBLIC_HTTP_BACKEND}/signin`,
         { email, password },
         { withCredentials: true },
       );

@@ -26,7 +26,7 @@ export default function SignUpPage() {
     setLoading(true);
     try {
       const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/signup`,
+        `${process.env.NEXT_PUBLIC_HTTP_BACKEND}/signup`,
         {
           name,
           photo,

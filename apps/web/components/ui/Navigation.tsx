@@ -15,6 +15,10 @@ export default function Navigation() {
     router.push("/signin");
   }
 
+  function handleStartDrawing() {
+    router.push("/canvas");
+  }
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
@@ -81,7 +85,7 @@ export default function Navigation() {
                 Sign In
               </button>
               <button
-                onClick={handleSignIn}
+                onClick={handleStartDrawing}
                 className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
               >
                 Start Drawing
@@ -135,10 +139,10 @@ export default function Navigation() {
                 About
               </a>
               <div className="px-3 py-2 space-y-2">
-                <button className="w-full px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-300 dark:hover:border-blue-500 font-medium">
+                <button className="w-full px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-300 dark:hover:border-blue-500 font-medium" onClick={handleSignIn}>
                   Sign In
                 </button>
-                <button className="w-full px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium rounded-lg">
+                <button className="w-full px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium rounded-lg" onClick={handleStartDrawing}>
                   Start Drawing
                 </button>
               </div>

@@ -1,20 +1,42 @@
-import AuthenticatedRoomCanvas from "../../../components/AuthenticatedRoomCanvas";
+import RoomCanvasWrapper from "../../../components/RoomCanvasWrapper";
 
-export default async function Page({ params }: { params: Promise<{roomId: string}> }) {
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ roomId: string }>;
+}) {
   const { roomId } = await params;
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/room/${roomId}`, {
-    credentials: "include",
-    cache: "no-store",
-  });
 
-  const data = await res.json();
+  const apiUrl =
+    process.env.INTERNAL_HTTP_BACKEND ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:4001";
 
-  if (!data.room) {
-    return <div className="text-center mt-10 text-red-500">Room not found.</div>;
+  try {
+    // 💥 HARDCODED INTERNAL DOCKER URL
+    const res = await fetch(`${apiUrl}/room/${roomId}`, {
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      return (
+        <div className="text-center mt-10 text-red-500">Room not found.</div>
+      );
+    }
+
+    const data = await res.json();
+    const isEphemeral = data.ephemeral === true || !data.room?.id;
+    const propId = isEphemeral ? roomId : String(data.room.id);
+
+    return <RoomCanvasWrapper roomId={propId} ephemeral={isEphemeral} />;
+  } catch (error) {
+    // We will definitely see this exact string if it fails again
+    console.error(`💥 BOOM - SSR Fetch failed:`, error);
+    return (
+      <div className="text-center mt-10 text-red-500">
+        Failed to connect to backend server.
+      </div>
+    );
   }
-
-  console.log(data);
-  
-
-  return <AuthenticatedRoomCanvas roomId={data.room.id} />;
 }
+

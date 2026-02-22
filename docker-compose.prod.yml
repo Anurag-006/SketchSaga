@@ -1,0 +1,79 @@
+# docker-compose.prod.yml
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sketchsaga_prod_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: turbo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: turbodb
+    ports:
+      - "5432:5432"
+    networks:
+      - sketchsaga_prod_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: sketchsaga_prod_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - sketchsaga_prod_net
+
+  http-backend:
+    # POINT TO ACR
+    image: anuragregistry01.azurecr.io/sketchsaga-http:v1
+    container_name: sketchsaga_prod_http
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+    environment:
+      DATABASE_URL: "postgresql://turbo:turbo@postgres:5432/turbodb?schema=public"
+      REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: "your_secure_secret_here"
+    command: sh -c "npx prisma db push --schema=./packages/database/prisma/schema.prisma --skip-generate && node apps/http-backend/dist/index.js"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - sketchsaga_prod_net
+
+  ws-backend:
+    # POINT TO ACR
+    image: anuragregistry01.azurecr.io/sketchsaga-ws:v1
+    container_name: sketchsaga_prod_ws
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: "postgresql://turbo:turbo@postgres:5432/turbodb?schema=public"
+      REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: "your_secure_secret_here"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - sketchsaga_prod_net
+
+  web:
+    # POINT TO ACR
+    image: anuragregistry01.azurecr.io/sketchsaga-web:v1
+    container_name: sketchsaga_prod_web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_HTTP_BACKEND: "http://${VM_PUBLIC_IP}:4001"
+      NEXT_PUBLIC_WS_BACKEND: "ws://${VM_PUBLIC_IP}:8080"
+      INTERNAL_HTTP_BACKEND: "http://http-backend:4001"
+    depends_on:
+      - http-backend
+      - ws-backend
+    networks:
+      - sketchsaga_prod_net
+
+networks:
+  sketchsaga_prod_net:

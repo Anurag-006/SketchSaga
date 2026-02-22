@@ -1,0 +1,36 @@
+# .dockerignore
+
+# Git
+**/.git
+**/.gitignore
+
+# Dependencies
+**/node_modules
+**/.pnp
+**/.pnp.js
+
+# Build outputs & caches
+**/.turbo
+**/.next
+**/dist
+**/out
+**/*.tsbuildinfo
+
+# Environment files (keep secrets out!)
+**/.env
+**/.env.*
+
+# Logs
+**/*.log
+
+# OS & editor files
+**/.DS_Store
+**/.vscode
+**/.idea
+**/*~
+**/#*#
+**/.*.swp
+
+# Optional: ignore root Dockerfile only if not needed
+# Dockerfile
+# .dockerignore

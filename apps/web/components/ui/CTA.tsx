@@ -1,3 +1,5 @@
+"use client";
+
 import { ArrowRight, Star } from "lucide-react";
 
 export default function CTA() {
@@ -32,7 +34,7 @@ export default function CTA() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <button className="inline-flex items-center px-8 py-4 bg-white text-blue-600 hover:bg-gray-50 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
+            <button onClick={() => window.location.href = '/canvas'} className="inline-flex items-center px-8 py-4 bg-white text-blue-600 hover:bg-gray-50 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
               Get Started Free
               <ArrowRight className="ml-2 w-5 h-5" />
             </button>

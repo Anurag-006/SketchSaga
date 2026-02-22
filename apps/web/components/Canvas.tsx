@@ -4,51 +4,53 @@ import { useEffect, useRef } from "react";
 import IconBar from "./IconBar";
 import { Game } from "../app/draw/Game";
 
-export default function Canvas({
-  roomId,
-  socket,
-}: {
+interface CanvasProps {
   roomId: string;
   socket: WebSocket;
-}) {
+  userId: string;
+}
+
+export default function Canvas({ roomId, socket, userId }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const currentShape = useRef("rect");
-  const gameRef = useRef<Game | null> (null);
+  const currentTool = useRef<
+    "rect" | "circle" | "line" | "pencil" | "selectTool"
+  >("rect");
+  const gameRef = useRef<Game | null>(null);
 
   useEffect(() => {
-    let game: Game | null = null;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
     const setCanvasSize = () => {
-      if (canvasRef.current) {
-        canvasRef.current.width = window.innerWidth;
-        canvasRef.current.height = window.innerHeight;
-      }
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
     };
 
+    setCanvasSize();
+
+    // Initialize Game instance
+    gameRef.current = new Game(canvas, roomId, socket, currentTool, userId);
+
+    // Handle window resize
     const handleResize = () => {
       setCanvasSize();
-      if (gameRef.current) {
-        gameRef.current.clearCanvas();
-      }
+      // Redraw shapes correctly after resize
+      gameRef.current?.redraw();
     };
 
-    if (canvasRef.current) {
-      setCanvasSize();
-      gameRef.current = new Game(canvasRef.current, roomId, socket, currentShape);
-      window.addEventListener("resize", handleResize);
-    }
+    window.addEventListener("resize", handleResize);
 
     return () => {
-      if (gameRef.current) gameRef.current?.destroy();
+      gameRef.current?.destroy();
       window.removeEventListener("resize", handleResize);
     };
-  }, [canvasRef, roomId, socket]);
+  }, [roomId, socket]);
 
   return (
     <div className="h-screen bg-black overflow-hidden">
-      <canvas ref={canvasRef}></canvas>
-      <div className="bg-white fixed top-6 rounded-2xl left-[80vh]">
-        <IconBar currentShape={currentShape} gameRef={gameRef} />
+      <canvas ref={canvasRef} className="block" />
+      <div className="bg-white fixed top-6 left-[80vh] rounded-2xl p-2">
+        <IconBar currentTool={currentTool} gameRef={gameRef} />
       </div>
     </div>
   );

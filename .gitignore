@@ -11,12 +11,14 @@ node_modules
 .env.development.local
 .env.test.local
 .env.production.local
+.env*.bak
 
 # Testing
 coverage
 
-# Turbo
+# Turbo & TypeScript
 .turbo
+*.tsbuildinfo
 
 # Vercel
 .vercel
@@ -27,12 +29,38 @@ out/
 build
 dist
 
+# Prisma (if you ever use local SQLite for testing)
+*.db
+*.db-journal
 
 # Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# Misc
-.DS_Store
+# Misc & Security
 *.pem
+*.key
+*.cer
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor / IDE settings
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*~
+\#*\#
+.#*

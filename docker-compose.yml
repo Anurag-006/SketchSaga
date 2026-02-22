@@ -1,10 +1,8 @@
 # docker-compose.yml
-version: "3.8"
-
 services:
   postgres:
-    image: postgres:16
-    container_name: turborepo_postgres
+    image: postgres:16-alpine
+    container_name: sketchsaga_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: turbo
@@ -15,10 +13,24 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - turborepo_net
+      - sketchsaga_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: sketchsaga_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    # Optional: Saves Redis data to disk every 60 seconds so ephemeral rooms survive container restarts
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - sketchsaga_net
 
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
-  turborepo_net:
+  sketchsaga_net:

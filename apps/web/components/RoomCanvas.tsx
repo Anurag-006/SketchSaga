@@ -9,24 +9,26 @@ function getTokenFromCookie(): string | null {
   return match ? match[2] : null;
 }
 
-export default function RoomCanvas({ roomId }: { roomId: string }) {
+export default function RoomCanvas({
+  roomId,
+  userId,
+}: {
+  roomId: string;
+  userId: string;
+}) {
   const [socket, setSocket] = useState<WebSocket | null>(null);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
 
     try {
+      // try to send auth token if we have one (guests will skip it)
       const token = localStorage.getItem("token");
-      if (!token) {
-        console.error("Token not found in cookies");
-      }
+      const wsUrl = token
+        ? `ws://localhost:8080?token=${encodeURIComponent(token)}`
+        : `ws://localhost:8080`;
 
-      console.log(document.cookie);
-
-
-      console.log(token);
-
-      ws = new WebSocket(`ws://localhost:8080?token=${token}`);
+      ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         console.log("✅ WebSocket opened");
@@ -36,7 +38,7 @@ export default function RoomCanvas({ roomId }: { roomId: string }) {
             JSON.stringify({
               type: "join-room",
               data: {
-                roomId: Number(roomId),
+                roomId: roomId, // string or number; server will handle
               },
             }),
           );
@@ -74,5 +76,6 @@ export default function RoomCanvas({ roomId }: { roomId: string }) {
     return <div>Loading...</div>;
   }
 
-  return <Canvas roomId={roomId} socket={socket} />;
+  return <Canvas roomId={roomId} socket={socket} userId={userId} />;
 }
+

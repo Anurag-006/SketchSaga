@@ -4,39 +4,58 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+generator client {
+  provider = "prisma-client-js"
+}
+
 model User {
-  id       String  @id @default(uuid())
-  email    String  @unique
-  photo    String?
-  password String
-  name     String
-  rooms    Room[]
-  chats    Chat[]
+  id        String   @id @default(uuid())
+  email     String?  @unique
+  name      String?
+  password  String? // null for OAuth or guest flows
+  createdAt DateTime @default(now())
+  rooms     Room[]   @relation("UserRooms")
+  chats     Chat[]
 }
 
 model Room {
-  id        Int      @id @default(autoincrement())
-  slug      String   @unique
-  createdAt DateTime @default(now())
-  chats     Chat[]
-  adminId   String
-  admin     User     @relation(fields: [adminId], references: [id])
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  name        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isEphemeral Boolean  @default(false)
+  // Owner if persistent (null for guest ephemeral rooms)
+  ownerId     String?
+  owner       User?    @relation("UserRooms", fields: [ownerId], references: [id])
+  chats       Chat[]
+  shapes      Shape[]
 }
 
 model Chat {
-  id      Int    @id @default(autoincrement())
-  roomId  Int
-  message String
-  userId  String
-  user    User   @relation(fields: [userId], references: [id])
-  room    Room   @relation(fields: [roomId], references: [id])
+  id        Int      @id @default(autoincrement())
+  message   String
+  createdAt DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  roomId    Int
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+}
+
+model Shape {
+  id        Int      @id @default(autoincrement())
+  type      String
+  data      Json
+  createdAt DateTime @default(now())
+  roomId    Int
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId]) // <-- Add this index
 }

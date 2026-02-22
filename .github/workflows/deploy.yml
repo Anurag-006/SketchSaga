@@ -1,0 +1,68 @@
+name: Production Deployment
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-push:
+    runs-with: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Azure Container Registry Login
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      # Build and Push HTTP Backend
+      - name: Build and Push HTTP Backend
+        run: |
+          docker build -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/sketchsaga-http:latest -f apps/http-backend/Dockerfile .
+          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/sketchsaga-http:latest
+
+      # Build and Push WS Backend
+      - name: Build and Push WS Backend
+        run: |
+          docker build -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/sketchsaga-ws:latest -f apps/ws-backend/Dockerfile .
+          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/sketchsaga-ws:latest
+
+      # Build and Push Web (Injects build-time env vars)
+      - name: Build and Push Web
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_HTTP_BACKEND=${{ secrets.NEXT_PUBLIC_HTTP_BACKEND }} \
+            --build-arg NEXT_PUBLIC_WS_BACKEND=${{ secrets.NEXT_PUBLIC_WS_BACKEND }} \
+            -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/sketchsaga-web:latest \
+            -f apps/web/Dockerfile .
+          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/sketchsaga-web:latest
+
+  deploy-to-vm:
+    needs: build-and-push
+    runs-with: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: azureuser
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            # Create project directory if it doesn't exist
+            mkdir -p ~/sketchsaga
+            cd ~/sketchsaga
+
+            # Login to ACR on the VM (Since we attached the role earlier, this is seamless)
+            sudo az acr login --name anuragregistry01
+
+            # Pull the new images
+            sudo docker compose -f docker-compose.prod.yml pull
+
+            # Restart services with the new images
+            sudo docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Clean up old unused images to save disk space
+            sudo docker image prune -f

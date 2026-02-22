@@ -14,10 +14,11 @@ export default function RoomOptionsPage() {
     setLoading(true);
     setError("");
     try {
+      const roomName = "Room " + Math.floor(Math.random() * 1000);
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/room`,
-        {},
-        { withCredentials: true }
+        { name: roomName },
+        { withCredentials: true },
       );
       router.push(`/canvas/${response.data.room.slug}`);
     } catch (err) {
@@ -33,10 +34,8 @@ export default function RoomOptionsPage() {
     setLoading(true);
     setError("");
     try {
-        const mainRoomId = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/room/${roomId}`)
       const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/room/${roomId}`,
-        { withCredentials: true }
+        `${process.env.NEXT_PUBLIC_API_URL}/room/${roomId}`
       );
       if (res.data.success) {
         router.push(`/canvas/${roomId}`);
@@ -57,7 +56,9 @@ export default function RoomOptionsPage() {
         {/* Create Room Card */}
         <div className="p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg flex flex-col justify-between">
           <div>
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Create a New Room</h2>
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
+              Create a New Room
+            </h2>
             <p className="text-gray-600 dark:text-gray-300 mb-6">
               Instantly spin up a new room for collaboration.
             </p>
@@ -74,7 +75,9 @@ export default function RoomOptionsPage() {
         {/* Join Room Card */}
         <div className="p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg flex flex-col justify-between">
           <div>
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Join an Existing Room</h2>
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
+              Join an Existing Room
+            </h2>
             <input
               type="text"
               placeholder="Enter Room ID"

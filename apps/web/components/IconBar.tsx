@@ -1,34 +1,37 @@
-import { RefObject, useState } from "react";
+import { RefObject, useEffect, useState } from "react";
 import {
   ArrowUpRight,
   RectangleHorizontal,
   Circle,
   Pencil,
   MousePointer2,
+  RotateCcw,
+  RotateCw,
 } from "lucide-react";
+import { Game } from "../app/draw/Game";
 
 // Tool definitions
 const tools = [
-  { name: "rect", Icon: RectangleHorizontal },
-  { name: "circle", Icon: Circle },
-  { name: "line", Icon: ArrowUpRight },
-  { name: "pencil", Icon: Pencil },
-  { name: "selectTool", Icon: MousePointer2 },
+  { name: "rect", Icon: RectangleHorizontal, label: "Rectangle" },
+  { name: "circle", Icon: Circle, label: "Circle" },
+  { name: "line", Icon: ArrowUpRight, label: "Line" },
+  { name: "pencil", Icon: Pencil, label: "Pencil" },
+  { name: "selectTool", Icon: MousePointer2, label: "Select" },
 ];
 
 export default function IconBar({
-  currentShape,
+  currentTool,
   gameRef,
 }: {
-  currentShape: RefObject<string>;
-  gameRef: RefObject<any>; // Replace `any` with your actual Game class type
+  currentTool: RefObject<string>;
+  gameRef: RefObject<Game | null>;
 }) {
   const [selected, setSelected] = useState("rect");
   const [color, setColor] = useState("#ffffff");
   const [strokeWidth, setStrokeWidth] = useState(2);
 
   const handleClick = (tool: string) => {
-    currentShape.current = tool;
+    currentTool.current = tool;
     setSelected(tool);
   };
 
@@ -48,7 +51,7 @@ export default function IconBar({
     <div className="flex flex-row items-center p-2 gap-4 bg-white shadow-lg rounded-2xl">
       {/* Tool Buttons */}
       <div className="flex gap-2">
-        {tools.map(({ name, Icon }) => {
+        {tools.map(({ name, Icon, label }) => {
           const baseClass = "p-2 rounded-2xl transition-all duration-150";
           const activeClass =
             selected === name ? "bg-red-300" : "bg-white hover:bg-gray-100";
@@ -57,6 +60,7 @@ export default function IconBar({
             <button
               key={name}
               onClick={() => handleClick(name)}
+              aria-label={label}
               className={`${baseClass} ${activeClass}`}
             >
               <Icon className="w-6 h-6" />
@@ -88,6 +92,24 @@ export default function IconBar({
           onChange={handleStrokeChange}
           className="w-24"
         />
+      </div>
+
+      {/* Undo / Redo */}
+      <div className="flex gap-2 ml-2">
+        <button
+          onClick={() => gameRef.current?.undo()}
+          className="p-2 bg-gray-100 hover:bg-gray-200 rounded-2xl"
+          aria-label="Undo"
+        >
+          <RotateCcw className="w-5 h-5" />
+        </button>
+        <button
+          onClick={() => gameRef.current?.redo()}
+          className="p-2 bg-gray-100 hover:bg-gray-200 rounded-2xl"
+          aria-label="Redo"
+        >
+          <RotateCw className="w-5 h-5" />
+        </button>
       </div>
     </div>
   );

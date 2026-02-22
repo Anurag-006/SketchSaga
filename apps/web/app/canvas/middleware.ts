@@ -21,5 +21,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/room/:path*"], // protect these routes
+  matcher: ["/dashboard/:path*"] // leave room routes open for guest access
 };

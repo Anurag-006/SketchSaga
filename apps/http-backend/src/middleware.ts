@@ -32,3 +32,23 @@ export function roomMiddleware(
     res.status(401).json({ message: "Invalid or expired token" });
   }
 }
+
+// similar to roomMiddleware but do not reject if token missing; attaches userId if valid
+export function optionalAuth(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  const token = req.cookies?.token;
+  if (!token) return next();
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    if (typeof decoded === "object" && decoded.userId) {
+      req.userId = decoded.userId;
+    }
+  } catch (e) {
+    console.warn("optionalAuth: invalid token", e);
+  }
+  next();
+}

@@ -47,6 +47,21 @@ export type Shape = RectShape | CircleShape | LineShape | PencilShape;
 
 type Tool = "selectTool" | "rect" | "circle" | "line" | "pencil";
 
+function generateId() {
+  // Use crypto if available (HTTPS), otherwise fallback to Math.random (HTTP)
+  if (
+    typeof window !== "undefined" &&
+    window.crypto &&
+    window.crypto.randomUUID
+  ) {
+    return window.crypto.randomUUID();
+  }
+  return (
+    Math.random().toString(36).substring(2, 15) +
+    Math.random().toString(36).substring(2, 15)
+  );
+}
+
 export class Game {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -224,7 +239,7 @@ export class Game {
         return;
       }
 
-      const id = crypto.randomUUID();
+      const id = generateId();
 
       if (tool === "pencil") {
         this.currentShape = {

@@ -181,36 +181,78 @@ wss.on("connection", async (ws: WebSocket, req) => {
             shape: Shape;
             final: boolean;
           };
-
           const key = String(roomId);
           const numeric = Number(roomId);
 
           if (!["rect", "circle", "line", "pencil"].includes(shape.type))
             return;
 
+          // 1. Broadcast to other users (Live movement)
           const payload = JSON.stringify({
             type: "shape",
             data: { roomId, shape, final, userId },
           });
-
           await pubClient.publish(`room:${key}`, payload);
 
+          // 2. Save to Storage (ONLY if final)
           if (final) {
+            // CHECK: Is this a Guest Room (Slug) or DB Room (ID)?
             if (isNaN(numeric)) {
-              // Write directly to Redis List instead of HTTP axios call
-              await pubClient.rPush(
+              // -------------------------------------------------
+              // 🛑 MISSING PART: REDIS STORAGE FOR GUEST MODE
+              // -------------------------------------------------
+
+              // A. Get all current shapes
+              const shapesData = await pubClient.lRange(
                 `room:${key}:shapes`,
-                JSON.stringify(shape),
+                0,
+                -1,
               );
-              await pubClient.expire(`room:${key}:shapes`, 3600); // 1 hour TTL
+
+              // B. Filter out the OLD version of this specific shape (Prevent Duplicates)
+              const updatedShapes = shapesData.filter((s) => {
+                try {
+                  return JSON.parse(s).id !== shape.id;
+                } catch {
+                  return true;
+                }
+              });
+
+              // C. Add the NEW version to the list
+              updatedShapes.push(JSON.stringify(shape));
+
+              // D. Overwrite the Redis list
+              await pubClient.del(`room:${key}:shapes`);
+
+              // E. Push updated list and reset Expiry
+              if (updatedShapes.length > 0) {
+                await pubClient.rPush(`room:${key}:shapes`, updatedShapes);
+                await pubClient.expire(`room:${key}:shapes`, 3600); // 1 hour TTL
+              }
             } else {
-              await prismaClient.shape.create({
-                data: { roomId: numeric, type: shape.type, data: shape },
+              // --- POSTGRES (Logged In Mode) ---
+              await prismaClient.shape.upsert({
+                where: {
+                  roomId_shapeId: {
+                    roomId: numeric,
+                    shapeId: shape.id!,
+                  },
+                },
+                update: {
+                  data: shape,
+                },
+                create: {
+                  roomId: numeric,
+                  shapeId: shape.id!,
+                  type: shape.type,
+                  data: shape,
+                },
               });
             }
           }
           break;
         }
+
         case "undo": {
           const { roomId, shapeId, userId } = message.data as {
             roomId: RoomId;

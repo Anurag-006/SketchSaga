@@ -51,11 +51,15 @@ model Chat {
 
 model Shape {
   id        Int      @id @default(autoincrement())
+  shapeId   String
   type      String
   data      Json
   createdAt DateTime @default(now())
   roomId    Int
   room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
-  @@index([roomId]) // <-- Add this index
+  // 2. Unique Constraint: A shapeId must be unique WITHIN a specific room.
+  // This prevents duplicates and allows fast upserts.
+  @@unique([roomId, shapeId])
+  @@index([roomId])
 }

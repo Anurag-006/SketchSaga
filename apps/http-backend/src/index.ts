@@ -215,7 +215,6 @@ app.post("/room", optionalAuth, async (req, res) => {
       ephemeral: true,
     });
   } catch (error) {
-    // 👈 This guarantees the server will never crash from a DB failure
     logger.error({ error }, "Fatal error during POST /room");
     return res
       .status(500)
@@ -234,7 +233,8 @@ app.get("/room/:slug", optionalAuth, async (req, res) => {
           orderBy: { createdAt: "asc" },
           include: { user: { select: { id: true, name: true } } },
         },
-        shapes: true,
+        // We do NOT fetch shapes here anymore to avoid payload bloat
+        // shapes are fetched via /shapes/:roomId
       },
     });
 
@@ -259,48 +259,89 @@ app.get("/room/:slug", optionalAuth, async (req, res) => {
 // ---------------- SHAPES ----------------
 
 app.get("/shapes/:roomId", async (req, res) => {
-  const rid = req.params.roomId as string;
-  const numeric = Number(rid);
+  try {
+    const rid = req.params.roomId as string;
+    let numericId = Number(rid);
 
-  if (isNaN(numeric)) {
-    // Fetch all shapes from the Redis List
-    const shapesData = await redisClient.lRange(`room:${rid}:shapes`, 0, -1);
-    const shapes = shapesData.map((s) => JSON.parse(s));
-    return res.json({ success: true, shapes });
+    // If the ID is a Slug (NaN), we must find the corresponding Numeric ID from the DB
+    if (isNaN(numericId)) {
+      const room = await prismaClient.room.findUnique({
+        where: { slug: rid },
+        select: { id: true },
+      });
+
+      if (room) {
+        // It's a persistent room! Use its numeric ID
+        numericId = room.id;
+      }
+    }
+
+    // CASE 1: Still NaN? It's definitely a Redis (Guest) room
+    if (isNaN(numericId)) {
+      const shapesData = await redisClient.lRange(`room:${rid}:shapes`, 0, -1);
+      const shapes = shapesData
+        .map((s) => {
+          try {
+            return JSON.parse(s);
+          } catch (e) {
+            return null;
+          }
+        })
+        .filter(Boolean);
+      return res.json({ success: true, shapes });
+    }
+
+    // CASE 2: We have a Numeric ID (either passed directly or resolved from slug)
+    // Fetch from Postgres
+    const shapes = await prismaClient.shape.findMany({
+      where: { roomId: numericId },
+      orderBy: { id: "asc" },
+    });
+
+    const formattedShapes = shapes.map((s: (typeof shapes)[number]) => {
+      const shapeData = s.data as any;
+      return {
+        ...shapeData,
+        id: s.shapeId,
+      };
+    });
+
+    res.json({
+      success: true,
+      shapes: formattedShapes,
+    });
+  } catch (error) {
+    logger.error({ error }, "Error fetching shapes");
+    res.status(500).json({ success: false, message: "Could not fetch shapes" });
   }
-
-  const shapes = await prismaClient.shape.findMany({
-    where: { roomId: numeric },
-    orderBy: { id: "asc" },
-  });
-
-  res.json({
-    success: true,
-    shapes: shapes.map((s: any) => ({ ...s.data, id: s.id })),
-  });
 });
 
 // ---------------- CHATS ----------------
 
 app.get("/chats/:roomId", optionalAuth, async (req, res) => {
-  const rid = req.params.roomId as string;
-  const numeric = Number(rid);
+  try {
+    const rid = req.params.roomId as string;
+    const numeric = Number(rid);
 
-  if (isNaN(numeric)) {
-    // Fetch all chats from the Redis List
-    const chatsData = await redisClient.lRange(`room:${rid}:chats`, 0, -1);
-    const messages = chatsData.map((c) => JSON.parse(c));
-    return res.status(200).json({ messages, success: true });
+    if (isNaN(numeric)) {
+      // Fetch all chats from the Redis List
+      const chatsData = await redisClient.lRange(`room:${rid}:chats`, 0, -1);
+      const messages = chatsData.map((c) => JSON.parse(c));
+      return res.status(200).json({ messages, success: true });
+    }
+
+    const messages = await prismaClient.chat.findMany({
+      where: { roomId: numeric },
+      orderBy: { id: "desc" },
+      take: 50,
+      include: { user: { select: { id: true, name: true } } },
+    });
+
+    res.status(200).json({ messages, success: true });
+  } catch (error) {
+    logger.error({ error }, "Error fetching chats");
+    res.status(500).json({ success: false, message: "Could not fetch chats" });
   }
-
-  const messages = await prismaClient.chat.findMany({
-    where: { roomId: numeric },
-    orderBy: { id: "desc" },
-    take: 50,
-    include: { user: { select: { id: true, name: true } } },
-  });
-
-  res.status(200).json({ messages, success: true });
 });
 
 // ---------------- USER ----------------

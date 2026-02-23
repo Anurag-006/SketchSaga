@@ -3,6 +3,7 @@
 import { useState } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function SignInPage() {
   const [email, setEmail] = useState("");
@@ -13,48 +14,48 @@ export default function SignInPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Add validation
-    if (!email || !password) {
-      setError("Please enter both email and password.");
-      return;
-    }
+    if (!email || !password)
+      return setError("Please enter both email and password.");
 
     setLoading(true);
     setError("");
 
-    // TODO: Add your actual sign-in logic here (API call, etc.)
     try {
-      const signInResponse = await axios.post(
+      const res = await axios.post(
         `${process.env.NEXT_PUBLIC_HTTP_BACKEND}/signin`,
         { email, password },
         { withCredentials: true },
       );
 
-      if (signInResponse.data.success) {
-        localStorage.setItem("token", signInResponse.data.token);
+      if (res.data.token) {
+        // ✅ Crucial: Save the token for the WebSocket connection
+        localStorage.setItem("token", res.data.token);
+        // Navigate to the room options or dashboard
         router.replace("/canvas");
       } else {
-        setError(signInResponse.data.message || "Sign-in failed.");
+        setError(res.data.message || "Invalid credentials.");
       }
-    } catch (error) {
-      console.error("Error during Sign-in: ", error);
-      setError("An error occurred while signing in. Please try again later.");
+    } catch (err: any) {
+      console.error("Sign-in error:", err);
+      setError(
+        err.response?.data?.message || "An error occurred. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
-    console.log("Sign in with:", { email, password });
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-4 transition-colors duration-300">
       <div className="w-full max-w-sm p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
         <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">
           Sign In
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="text-red-500 text-sm">{error}</div>}
+          {error && (
+            <div className="text-red-500 text-sm text-center">{error}</div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -62,10 +63,11 @@ export default function SignInPage() {
             </label>
             <input
               type="email"
-              className="w-full px-4 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-4 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="you@example.com"
             />
           </div>
 
@@ -75,10 +77,11 @@ export default function SignInPage() {
             </label>
             <input
               type="password"
-              className="w-full px-4 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full px-4 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="••••••••"
             />
           </div>
 
@@ -90,6 +93,16 @@ export default function SignInPage() {
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
+
+        <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6">
+          New to SketchSaga?{" "}
+          <Link
+            href="/signup"
+            className="text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            Create an account
+          </Link>
+        </p>
       </div>
     </div>
   );

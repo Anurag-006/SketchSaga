@@ -1,13 +1,8 @@
 "use client";
 
-import { WS_BACKEND } from "../app/config";
+import { WS_BACKEND } from "../app/config"; // Using the dynamic config
 import { useEffect, useState } from "react";
 import Canvas from "./Canvas";
-
-function getTokenFromCookie(): string | null {
-  const match = document.cookie.match(/(^| )token=([^;]+)/);
-  return match ? match[2] : null;
-}
 
 export default function RoomCanvas({
   roomId,
@@ -22,29 +17,22 @@ export default function RoomCanvas({
     let ws: WebSocket | null = null;
 
     try {
-      // try to send auth token if we have one (guests will skip it)
       const token = localStorage.getItem("token");
+
       const wsUrl = token
-        ? `ws://localhost:8080?token=${encodeURIComponent(token)}`
-        : `ws://localhost:8080`;
+        ? `${WS_BACKEND}?token=${encodeURIComponent(token)}`
+        : WS_BACKEND;
 
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         console.log("✅ WebSocket opened");
-
-        try {
-          ws?.send(
-            JSON.stringify({
-              type: "join-room",
-              data: {
-                roomId: roomId, // string or number; server will handle
-              },
-            }),
-          );
-        } catch (sendErr) {
-          console.error("❌ Error sending join-room message", sendErr);
-        }
+        ws?.send(
+          JSON.stringify({
+            type: "join-room",
+            data: { roomId: roomId },
+          }),
+        );
       };
 
       ws.onmessage = (event) => {
@@ -63,19 +51,22 @@ export default function RoomCanvas({
     } catch (err) {
       console.error("❌ Failed to create WebSocket:", err);
     }
-    //TODO: Remove before production. The readyState === 1 is for convinence and is a bug.
+
     return () => {
       if (ws) {
         console.log("Closing WebSocket on RoomCanvas unmount");
-        ws?.close();
+        ws.close();
       }
     };
   }, [roomId]);
 
   if (!socket) {
-    return <div>Loading...</div>;
+    return (
+      <div className="h-screen bg-black flex items-center justify-center text-white">
+        Connecting to Canvas...
+      </div>
+    );
   }
 
   return <Canvas roomId={roomId} socket={socket} userId={userId} />;
 }
-

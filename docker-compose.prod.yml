@@ -66,8 +66,6 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_HTTP_BACKEND: "http://${VM_PUBLIC_IP}:4001"
-      NEXT_PUBLIC_WS_BACKEND: "ws://${VM_PUBLIC_IP}:8080"
       INTERNAL_HTTP_BACKEND: "http://http-backend:4001"
     depends_on:
       - http-backend

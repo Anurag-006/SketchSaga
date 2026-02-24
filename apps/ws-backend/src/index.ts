@@ -50,6 +50,11 @@ interface WebSocketMessageBase {
   data: Record<string, any>;
 }
 
+type Coordinates = {
+  x: number;
+  y: number;
+};
+
 type WebSocketMessage =
   | { type: "join-room"; data: { roomId: RoomId } }
   | { type: "leave-room"; data: { roomId: RoomId } }
@@ -57,6 +62,15 @@ type WebSocketMessage =
   | {
       type: "shape";
       data: { roomId: RoomId; shape: Shape; final: boolean; userId: string };
+    }
+  | {
+      type: "mouse";
+      data: {
+        roomId: RoomId;
+        userId: string;
+        coordinates: Coordinates;
+        username: string;
+      };
     }
   | { type: "undo"; data: { roomId: RoomId; shapeId: string; userId: string } };
 
@@ -304,6 +318,25 @@ wss.on("connection", async (ws: WebSocket, req) => {
               });
             }
           }
+          break;
+        }
+
+        case "mouse": {
+          const { roomId, userId, coordinates, username } = message.data as {
+            roomId: RoomId;
+            userId: string;
+            coordinates: Coordinates;
+            username: string;
+          };
+
+          const key = String(roomId);
+
+          const payload = JSON.stringify({
+            type: "mouse",
+            data: { roomId, userId, coordinates, username },
+          });
+
+          await pubClient.publish(`room:${key}`, payload);
           break;
         }
       }

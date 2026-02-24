@@ -2,7 +2,6 @@ import { RefObject } from "react";
 import { getExistingShapes } from "./http";
 
 // --- TYPES ---
-// (Keep your existing types)
 type BaseShape = {
   id: string;
   userId: string;
@@ -18,7 +17,6 @@ type RectShape = BaseShape & {
   width: number;
   height: number;
 };
-
 type CircleShape = BaseShape & {
   type: "circle";
   x: number;
@@ -29,7 +27,6 @@ type CircleShape = BaseShape & {
   startAngle: number;
   endAngle: number;
 };
-
 type LineShape = BaseShape & {
   type: "line";
   x1: number;
@@ -37,7 +34,6 @@ type LineShape = BaseShape & {
   x2: number;
   y2: number;
 };
-
 type PencilShape = BaseShape & {
   type: "pencil";
   points: { x: number; y: number }[];
@@ -62,7 +58,6 @@ function generateId() {
 }
 
 // --- INTERPOLATION HELPER ---
-// LINEAR INTERPOLATION: Smoothly transitions value a to b by factor t
 const lerp = (start: number, end: number, t: number) => {
   return start + (end - start) * t;
 };
@@ -78,8 +73,15 @@ export class Game {
   private undone: Shape[] = [];
   private roomId: string;
   private myUserId: string;
+  private myName: string;
   private socket: WebSocket;
   private currentTool: RefObject<string>;
+
+  // 1. FIX: Use a Map (not Array) so we only keep the LATEST position per user
+  private userPositions = new Map<
+    string,
+    { x: number; y: number; name: string }
+  >();
 
   private isDrawing = false;
   private startX = 0;
@@ -93,8 +95,11 @@ export class Game {
   private offsetY = 0;
 
   private lastSentTime = 0;
-  // 3G OPTIMIZATION: Lower tick rate to save bandwidth (50ms = 20fps updates)
-  private readonly THROTTLE_MS = 50;
+  private THROTTLE_MS = 50;
+
+  // 2. FIX: Specific throttle for mouse movement (limits network calls)
+  private lastMouseTime = 0;
+  private readonly MOUSE_THROTTLE_MS = 50;
 
   private handleMouseDown!: (e: MouseEvent) => void;
   private handleMouseUp!: (e: MouseEvent) => void;
@@ -102,11 +107,7 @@ export class Game {
   private handleKeyDown!: (e: KeyboardEvent) => void;
   private animationFrameId: number | null = null;
 
-  // 3G OPTIMIZATION: Store target state for interpolation
   private remotePreviews = new Map<string, { current: Shape; target: Shape }>();
-
-  // 3G OPTIMIZATION: Prevent "Snap Back"
-  // Keep track of shapes we recently touched so we ignore laggy server packets for them
   private recentlyEdited = new Set<string>();
 
   constructor(
@@ -115,6 +116,7 @@ export class Game {
     socket: WebSocket,
     currentTool: RefObject<string>,
     myUserId: string,
+    myName: string,
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -127,6 +129,7 @@ export class Game {
     this.socket = socket;
     this.currentTool = currentTool;
     this.myUserId = myUserId;
+    this.myName = myName;
 
     this.init();
     this.initHandlers();
@@ -156,13 +159,9 @@ export class Game {
         const final = message.data.final;
         const fromUser = message.data.userId as string;
 
-        // 🛑 ECHO CANCELLATION & LAG PROTECTION
         if (fromUser === this.myUserId) return;
         if (this.currentShape?.id === shape.id) return;
         if (this.selectedShape?.id === shape.id) return;
-
-        // If we recently edited this shape, ignore updates for a while (500ms)
-        // This stops the shape from snapping back to old positions due to lag
         if (this.recentlyEdited.has(shape.id)) return;
 
         if (final) {
@@ -171,15 +170,10 @@ export class Game {
           this.shapes.push(shape);
           this.redrawOffscreen();
         } else {
-          // INTERPOLATION SETUP:
-          // Instead of replacing the shape, we set a "Target".
-          // The render loop will slide 'current' towards 'target'.
           const existing = this.remotePreviews.get(fromUser);
           if (existing) {
-            // Update the target, keep the current visual state for smoothing
             existing.target = shape;
           } else {
-            // First time seeing this shape? Snap to it immediately.
             this.remotePreviews.set(fromUser, {
               current: shape,
               target: shape,
@@ -187,9 +181,27 @@ export class Game {
           }
         }
       }
+
+      // 3. FIX: Handle Mouse Updates Efficiently
+      if (message.type === "mouse") {
+        const { userId, coordinates, username } = message.data;
+        // Ignore our own broadcast
+        if (userId === this.myUserId) return;
+
+        // Update the Map with the latest coordinates
+        this.userPositions.set(userId, {
+          x: coordinates.x,
+          y: coordinates.y,
+          name: username || "Anonymous",
+        });
+
+        // Note: We DO NOT call redrawOffscreen() here.
+        // Cursors are drawn in the main loop (redraw) which runs 60fps anyway.
+      }
     };
   }
 
+  // ... (initKeyboardHandlers, setColor, setStrokeWidth, undo, redo - Keep these the same) ...
   private initKeyboardHandlers() {
     this.handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
@@ -203,8 +215,6 @@ export class Game {
     };
     window.addEventListener("keydown", this.handleKeyDown);
   }
-
-  // ... (setColor, setStrokeWidth, undo, redo methods remain the same) ...
   setColor(color: string) {
     this.color = color;
   }
@@ -252,10 +262,7 @@ export class Game {
         this.selectShape(e);
         return;
       }
-
       const id = generateId();
-
-      // ... (Shape Factory Logic remains same as previous step) ...
       if (tool === "pencil") {
         this.currentShape = {
           id,
@@ -305,57 +312,65 @@ export class Game {
           strokeWidth: this.strokeWidth,
         } as CircleShape;
       }
-
       if (this.currentShape && this.currentShape.type !== "pencil")
         this.sendShape(this.currentShape, false);
     };
 
     this.handleMouseMove = (e) => {
-      if (!this.isDrawing) return;
-      const x = e.offsetX;
-      const y = e.offsetY;
+      const x = e.clientX;
+      const y = e.clientY;
 
-      if (this.selectedShape) {
-        this.updateSelectedShapePosition(x, y);
-        this.throttledSend(this.selectedShape, false);
-      } else if (this.currentShape) {
-        this.updateCurrentShapeGeometry(x, y);
-        if (this.currentShape.type !== "pencil") {
-          this.throttledSend(this.currentShape, false);
-        } else {
-          // 3G OPTIMIZATION: Even heavier throttle for pencil
-          // We only send pencil updates every ~100ms or so to prevent packet flooding
-          this.throttledSend(this.currentShape, false);
+      if (this.isDrawing) {
+        if (this.selectedShape) {
+          this.updateSelectedShapePosition(x, y);
+          this.throttledSend(this.selectedShape, false);
+        } else if (this.currentShape) {
+          this.updateCurrentShapeGeometry(x, y);
+          if (this.currentShape.type !== "pencil") {
+            this.throttledSend(this.currentShape, false);
+          } else {
+            this.throttledSend(this.currentShape, false);
+          }
         }
+      }
+
+      // 4. FIX: Throttled Network Call
+      const now = Date.now();
+      if (now - this.lastMouseTime > this.MOUSE_THROTTLE_MS) {
+        this.socket.send(
+          JSON.stringify({
+            type: "mouse",
+            data: {
+              roomId: this.roomId,
+              userId: this.myUserId,
+              coordinates: { x, y },
+              username: this.myName,
+            },
+          }),
+        );
+        this.lastMouseTime = now;
       }
     };
 
     this.handleMouseUp = (e) => {
       if (!this.isDrawing) return;
       this.isDrawing = false;
-
       if (this.selectedShape) {
         this.shapes.push(this.selectedShape);
         this.redrawOffscreen();
         this.sendShape(this.selectedShape, true);
-
-        // 3G FIX: Mark this shape as "Just Edited".
-        // Ignore server updates for it for 500ms to prevent "Rubber Banding"
         const id = this.selectedShape.id;
         this.recentlyEdited.add(id);
         setTimeout(() => this.recentlyEdited.delete(id), 500);
-
         this.selectedShape = null;
       } else if (this.currentShape) {
         this.shapes.push(this.currentShape);
         this.undone = [];
         this.redrawOffscreen();
         this.sendShape(this.currentShape, true);
-
         const id = this.currentShape.id;
         this.recentlyEdited.add(id);
         setTimeout(() => this.recentlyEdited.delete(id), 500);
-
         this.currentShape = null;
       }
     };
@@ -416,7 +431,6 @@ export class Game {
     render();
   }
 
-  // ... (redrawOffscreen remains same) ...
   private redrawOffscreen() {
     this.offscreenCanvas.width = this.canvas.width;
     this.offscreenCanvas.height = this.canvas.height;
@@ -440,29 +454,57 @@ export class Game {
       this.redrawOffscreen();
     }
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // 1. Draw Background
     this.ctx.drawImage(this.offscreenCanvas, 0, 0);
 
-    // 🌟 INTERPOLATION LOGIC 🌟
-    // Iterate through remote previews and smooth them
+    // 2. Draw Other Users' Shapes
     for (const [userId, wrapper] of this.remotePreviews.entries()) {
       this.smoothRemoteShape(wrapper.current, wrapper.target);
       this.drawShape(wrapper.current, false, this.ctx);
     }
 
-    if (this.currentShape) {
-      this.drawShape(this.currentShape, false, this.ctx);
-    }
-    if (this.selectedShape) {
-      this.drawShape(this.selectedShape, true, this.ctx);
+    // 3. Draw Current/Selected Shape
+    if (this.currentShape) this.drawShape(this.currentShape, false, this.ctx);
+    if (this.selectedShape) this.drawShape(this.selectedShape, true, this.ctx);
+
+    // 5. FIX: Draw User Positions from the Map
+    // We draw these last so they float ON TOP of everything
+    for (const [userId, coords] of this.userPositions.entries()) {
+      this.drawUserCursor(userId, coords, this.ctx);
     }
   }
 
-  // 3G SMOOTHING FUNCTION
-  private smoothRemoteShape(current: Shape, target: Shape) {
-    // 0.2 means we move 20% of the way to the target every frame.
-    // This creates a smooth "slide" effect rather than a teleport.
-    const smoothingFactor = 0.2;
+  // 6. FIX: Improved Cursor Drawing Function
+  private drawUserCursor(
+    userId: string,
+    position: { x: number; y: number; name: string },
+    context: CanvasRenderingContext2D,
+  ) {
+    const { x, y, name } = position;
 
+    context.save();
+    context.fillStyle = "blue";
+    context.beginPath();
+    context.arc(x, y, 5, 0, 2 * Math.PI);
+    context.fill();
+
+    // Draw Name Tag
+    context.font = "12px sans-serif";
+    context.fillStyle = "white";
+    // Draw a small background box for the text so it's readable
+    const textWidth = context.measureText(name).width;
+    context.fillStyle = "rgba(0,0,0,0.5)";
+    context.fillRect(x + 8, y - 10, textWidth + 4, 14);
+
+    context.fillStyle = "white";
+    context.fillText(name, x + 10, y + 2);
+    context.restore();
+  }
+
+  // ... (smoothRemoteShape, drawShape, drawSelectionHighlight, throttledSend, sendShape, isPointInShape, pointToLineDistance, selectShape, destroy - Keep these the same) ...
+  private smoothRemoteShape(current: Shape, target: Shape) {
+    const smoothingFactor = 0.2;
     if (current.type === "rect" && target.type === "rect") {
       current.x = lerp(current.x, target.x, smoothingFactor);
       current.y = lerp(current.y, target.y, smoothingFactor);
@@ -479,14 +521,10 @@ export class Game {
       current.x2 = lerp(current.x2, target.x2, smoothingFactor);
       current.y2 = lerp(current.y2, target.y2, smoothingFactor);
     } else if (current.type === "pencil" && target.type === "pencil") {
-      // Pencil is hard to interpolate perfectly point-by-point.
-      // Easiest "Smooth" fix: just take the target points but render them
-      // We can optimize this later, but for now just sync the points.
       current.points = target.points;
     }
   }
 
-  // ... (drawShape, drawSelectionHighlight, pointToLineDistance, etc. remain the same) ...
   private drawShape(
     shape: Shape,
     highlight = false,
@@ -496,7 +534,6 @@ export class Game {
     context.lineWidth = shape.strokeWidth || 2;
     context.lineCap = "round";
     context.lineJoin = "round";
-
     context.beginPath();
     switch (shape.type) {
       case "rect":
@@ -585,7 +622,6 @@ export class Game {
 
   private throttledSend(shape: Shape, final: boolean) {
     const now = Date.now();
-    // 3G OPTIMIZATION: Only send every 50ms unless it's the final update
     if (now - this.lastSentTime > this.THROTTLE_MS || final) {
       this.sendShape(shape, final);
       this.lastSentTime = now;
@@ -602,7 +638,6 @@ export class Game {
     );
   }
 
-  // ... (isPointInShape, pointToLineDistance, selectShape, destroy remain the same) ...
   private isPointInShape(x: number, y: number, shape: Shape): boolean {
     const threshold = shape.strokeWidth + 10;
     switch (shape.type) {
@@ -690,14 +725,12 @@ export class Game {
     const x = e.offsetX;
     const y = e.offsetY;
     this.selectedShape = null;
-
     for (let i = this.shapes.length - 1; i >= 0; i--) {
       const shape = this.shapes[i];
       if (this.isPointInShape(x, y, shape)) {
         this.selectedShape = shape;
         this.shapes.splice(i, 1);
         this.redrawOffscreen();
-
         if (shape.type === "rect" || shape.type === "circle") {
           this.offsetX = x - shape.x;
           this.offsetY = y - shape.y;
